@@ -126,14 +126,6 @@ const BASE_SYSTEM = `Sen İslami ilimlerde derin uzmanlığa sahip, klasik medre
 // ── Status: idle | pending | streaming | done | error
 const initialStatus = () => Object.fromEntries(DISCIPLINES.map(d => [d.id, "idle"]));
 
-function ArabicText({ children, size = 22 }) {
-  return (
-    <span style={{ fontFamily: "'Amiri','Scheherazade New',serif", fontSize: size, lineHeight: 1.9, direction: "rtl" }}>
-      {children}
-    </span>
-  );
-}
-
 // ── Lightweight markdown renderer
 function renderMd(text) {
   if (!text) return null;
@@ -410,4 +402,115 @@ export default function MizanAnaliz() {
             {DISCIPLINES.map(d => {
               const on = selected.includes(d.id);
               return (
-                <button key={d.id} onClick={() => toggle(
+                <button key={d.id} onClick={() => toggle(d.id)} disabled={running}
+                  style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, cursor: running ? "default" : "pointer", transition: ".18s", textAlign: "left", fontFamily: "inherit",
+                    border: `1.5px solid ${on ? d.color : "rgba(255,255,255,.07)"}`,
+                    background: on ? d.color + "16" : "rgba(255,255,255,.02)",
+                    color: on ? d.color : "rgba(240,230,208,.38)" }}>
+                  <span style={{ fontSize: 16 }}>{d.icon}</span>
+                  <span>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.15 }}>{d.label}</div>
+                    <div style={{ fontFamily: "'Amiri',serif", fontSize: 11, opacity: .65 }}>{d.labelAr}</div>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {globalError && (
+          <div style={{ padding: "11px 15px", borderRadius: 9, background: "rgba(200,60,60,.1)", border: "1px solid rgba(200,60,60,.3)", color: "#FF9090", fontSize: 14, marginBottom: 14 }}>
+            {globalError}
+          </div>
+        )}
+
+        {/* ── Ana buton ── */}
+        {!running ? (
+          <button onClick={analyzeAll} disabled={!input.trim()}
+            style={{ width: "100%", padding: 16, borderRadius: 12, border: "none", cursor: input.trim() ? "pointer" : "not-allowed",
+              background: input.trim() ? "linear-gradient(135deg,#E0AD3E,#A87A1C)" : "rgba(200,148,42,.15)",
+              color: input.trim() ? "#14100A" : "rgba(200,148,42,.35)",
+              fontSize: 17, fontWeight: 700, fontFamily: "inherit", letterSpacing: .4,
+              boxShadow: input.trim() ? "0 4px 24px rgba(200,148,42,.25)" : "none" }}>
+            ✦ Analizi Başlat — {selected.length} disiplin ayrı ayrı incelenecek
+          </button>
+        ) : (
+          <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ flex: 1, padding: 15, borderRadius: 12, background: "rgba(200,148,42,.08)", border: "1px solid rgba(200,148,42,.25)", textAlign: "center", fontSize: 15 }}>
+              <span style={{ animation: "blink 1.4s infinite" }}>◉</span>&nbsp; Analiz sürüyor — {doneCount}/{selected.length} tamamlandı
+            </div>
+            <button onClick={stopAll} style={{ padding: "0 20px", borderRadius: 12, border: "1px solid rgba(200,60,60,.4)", background: "rgba(200,60,60,.08)", color: "#FF9090", cursor: "pointer", fontFamily: "inherit", fontSize: 14 }}>
+              Durdur
+            </button>
+          </div>
+        )}
+
+        {/* ── Sonuçlar ── */}
+        {anyResult && (
+          <section ref={resultsRef} style={{ marginTop: 36, animation: "fadeUp .4s ease-out" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid rgba(200,148,42,.18)" }}>
+              <div style={{ fontFamily: "'Amiri',serif", fontSize: 21, color: "#C8942A", fontWeight: 700 }}>
+                Analiz Sonuçları · نتائج التحليل
+              </div>
+              <button onClick={copyAll} style={{ padding: "7px 14px", borderRadius: 8, border: "1px solid rgba(200,148,42,.3)", background: "rgba(200,148,42,.08)", color: "#C8942A", cursor: "pointer", fontSize: 13, fontFamily: "inherit" }}>
+                ⧉ Tümünü Kopyala
+              </button>
+            </div>
+
+            {/* Sekmeler */}
+            <div className="tabrow" style={{ display: "flex", gap: 6, marginBottom: 0, paddingBottom: 8 }}>
+              {DISCIPLINES.filter(d => selected.includes(d.id)).map(d => {
+                const st = status[d.id];
+                const active = activeTab === d.id;
+                return (
+                  <button key={d.id}
+                    onClick={() => { setActiveTab(d.id); if (st === "error") retryOne(d.id); }}
+                    style={{ padding: "9px 14px", borderRadius: "10px 10px 0 0", whiteSpace: "nowrap", cursor: "pointer", fontFamily: "inherit", fontSize: 13.5, fontWeight: 600, transition: ".15s",
+                      border: `1.5px solid ${active ? d.color : "rgba(255,255,255,.07)"}`,
+                      borderBottom: active ? "1.5px solid transparent" : undefined,
+                      background: active ? d.color + "14" : "rgba(255,255,255,.02)",
+                      color: active ? d.color : st === "done" ? "rgba(240,230,208,.6)" : "rgba(240,230,208,.3)" }}>
+                    {d.label}{" "}
+                    <span style={{ fontSize: 11, opacity: .8, animation: st === "streaming" || st === "pending" ? "blink 1.2s infinite" : "none" }}>
+                      {statusIcon(st)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Aktif sekme içeriği */}
+            {activeTab && (() => {
+              const d = DISCIPLINES.find(x => x.id === activeTab);
+              const st = status[activeTab];
+              const txt = results[activeTab];
+              return (
+                <div style={{ border: `1.5px solid ${d.color}40`, borderRadius: "0 12px 12px 12px", background: "rgba(255,255,255,.018)", padding: "20px 24px", minHeight: 160 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                    <span style={{ fontSize: 20 }}>{d.icon}</span>
+                    <span style={{ fontFamily: "'Amiri',serif", fontSize: 20, fontWeight: 700, color: d.color }}>
+                      {d.label} · {d.labelAr}
+                    </span>
+                  </div>
+                  {st === "pending" && !txt && (
+                    <p style={{ color: "rgba(240,230,208,.4)", fontStyle: "italic", animation: "blink 1.4s infinite" }}>Sırada bekliyor...</p>
+                  )}
+                  {txt && <div>{renderMd(txt)}{st === "streaming" && <span style={{ animation: "blink .8s infinite", color: d.color }}>▌</span>}</div>}
+                  {st === "error" && (
+                    <button onClick={() => retryOne(d.id)} style={{ marginTop: 10, padding: "8px 16px", borderRadius: 8, border: `1px solid ${d.color}`, background: d.color + "14", color: d.color, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>
+                      ↻ Bu disiplini tekrar dene
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+          </section>
+        )}
+
+        <footer style={{ marginTop: 56, paddingTop: 20, borderTop: "1px solid rgba(255,255,255,.05)", textAlign: "center", fontSize: 12, color: "rgba(240,230,208,.22)" }}>
+          <span style={{ fontFamily: "'Amiri',serif", fontSize: 14 }}>6NGen</span> · MÎZÂN v2 · Her disiplin bağımsız analiz edilir
+        </footer>
+      </main>
+    </div>
+  );
+}
